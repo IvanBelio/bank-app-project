@@ -2,36 +2,27 @@ const express = require('express')
 const cors = require('cors')
 const jwt = require('jsonwebtoken')
 const bodyParser = require('body-parser')
-
 const accounts = require('./accounts')
-
 const app = express()
-
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: false }))
-
 // parse application/json
 app.use(bodyParser.json())
-
 app.use(cors())
-const port = 3000
-
+const port = 4000
 // Custom debug logging function
 const debugLog = (message) => {
   if (process.env.NODE_ENV !== 'test') {
     console.log('[DEBUG]', message)
   }
 }
-
 // Define your endpoints
-
 // login
 app.get('/login', (req, res) => {
   debugLog('Received a login request.')
   const username = req.query.username
   const pin = req.query.pin
   const account = accounts.find((account) => account.username === username)
-
   if (account && account.pin === Number(pin)) {
     const token = jwt.sign({ username: account.username }, 'secret_key', {
       expiresIn: '1h',
@@ -46,56 +37,68 @@ app.get('/login', (req, res) => {
   }
 })
 
+app.post("/transactions", (req, res) => {
+  const { type, amount } = req.body;
+
+  if (type === "deposit") {
+    account.movements.push({ type, amount });
+  } else if (type === "withdrawal") {
+
+    account.movements.push({ type, amount: -amount });
+  }
+
+  res.json({ success: true, message: "Transaction successful", account });
+});
+
 // User data retrieval endpoint
 app.get('/user', (req, res) => {
   const token = req.query.token
-
   jwt.verify(token, 'secret_key', (err, decoded) => {
     if (err) {
       debugLog('Unauthorized request.')
       return res.status(401).json({ message: 'Unauthorized' })
     }
-
     const account = accounts.find((acc) => acc.username === decoded.username)
     if (!account) {
       debugLog('Account not found.')
       return res.status(404).json({ message: 'Account not found' })
     }
-
     debugLog(`User data retrieved successfully for user: ${decoded.username}`)
     res.json({ account })
   })
 })
-
 app.post('/movements', (req, res) => {
   debugLog('Received a movement request.')
   const token = req.query.token
-  const movement = req.body.movement
-
+  const movement = req.body
+  debugLog(`Token: ${token}`)
+  debugLog(`Movement: ${JSON.stringify(movement)}`)
   jwt.verify(token, 'secret_key', (err, decoded) => {
     if (err) {
       debugLog('Unauthorized request.')
       return res.status(401).json({ message: 'Unauthorized' })
     }
     debugLog(`Authorized movement request for user: ${decoded.username}`)
-
     // Validate the movement object
     if (
       !movement ||
       typeof movement !== 'object' ||
-      !movement.hasOwnProperty('amount') ||
-      !movement.hasOwnProperty('date')
+      !movement.amount ||
+      !movement.date
     ) {
-      debugLog('Invalid movement object.')
-      return res.status(400).json({ message: 'Invalid movement object' })
+      debugLog(
+        'Invalid movement object it should be an object with properties amount and date'
+      )
+      return res.status(400).json({
+        message: 'Invalid movement object',
+      })
     }
-
     // Validate the amount field
-    if (typeof movement.amount !== 'number' || movement.amount <= 0) {
-      debugLog('Invalid amount.')
+    const amount = parseFloat(movement.amount)
+    if (isNaN(amount)) {
+      debugLog('Invalid amount it should be a number.')
       return res.status(400).json({ message: 'Invalid amount' })
     }
-
     // Validate the date field format
     const dateFormatRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/
     if (
@@ -105,16 +108,14 @@ app.post('/movements', (req, res) => {
       debugLog('Invalid date format.')
       return res.status(400).json({ message: 'Invalid date format' })
     }
-
     // Perform movement update logic here
     const accountIndex = accounts.findIndex(
       (acc) => acc.username === decoded.username
     )
-
     if (accountIndex !== -1) {
       // Check if the requested amount is greater than the account balance
       if (
-        movement.amount >
+        amount >
         accounts[accountIndex].movements.reduce(
           (acc, movement) => acc + movement.amount,
           0
@@ -124,7 +125,7 @@ app.post('/movements', (req, res) => {
         return res.status(400).json({ message: 'Insufficient balance' })
       }
       accounts[accountIndex].movements.push({
-        amount: movement.amount,
+        amount,
         date: new Date().toISOString(),
       })
       debugLog('Movements updated successfully.')
@@ -135,18 +136,15 @@ app.post('/movements', (req, res) => {
     }
   })
 })
-
 app.post('/transfer', (req, res) => {
   debugLog('Received a transfer request.')
   const token = req.query.token
   const { destinationAccount, amount } = req.body
-
   jwt.verify(token, 'secret_key', (err, decoded) => {
     if (err) {
       debugLog('Unauthorized request.')
       return res.status(401).json({ message: 'Unauthorized' })
     }
-
     debugLog(`Authorized transfer request for user: ${decoded.username}`)
     // Find source account based on the username in the token
     const sourceIndex = accounts.findIndex(
@@ -156,9 +154,7 @@ app.post('/transfer', (req, res) => {
       debugLog('Source account not found.')
       return res.status(404).json({ message: 'Source account not found' })
     }
-
     const sourceAccountObj = accounts[sourceIndex]
-
     // Check if the source account has sufficient balance
     if (
       sourceAccountObj.movements.reduce(
@@ -169,7 +165,6 @@ app.post('/transfer', (req, res) => {
       debugLog('Insufficient balance.')
       return res.status(400).json({ message: 'Insufficient balance' })
     }
-
     // Find destination account
     const destinationIndex = accounts.findIndex(
       (acc) => acc.numberAccount === destinationAccount
@@ -178,27 +173,22 @@ app.post('/transfer', (req, res) => {
       debugLog('Destination account not found.')
       return res.status(404).json({ message: 'Destination account not found' })
     }
-
     // Deduct amount from the source account
     sourceAccountObj.movements.push({
       amount: -amount,
       date: new Date().toISOString(),
     })
-
     // Add amount to the destination account
     accounts[destinationIndex].movements.push({
       amount,
       date: new Date().toISOString(),
     })
-
     debugLog('Transfer successful.')
     res.json({ message: 'Transfer successful' })
   })
 })
-
 // Start the server
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`)
 })
-
 module.exports = app
