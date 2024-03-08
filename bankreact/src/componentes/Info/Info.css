@@ -1,0 +1,13 @@
+.account-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    text-decoration: none;
+    font-size: large;
+}
+
+.account {
+    width: 100%; /* Define el ancho del contenido */
+    font-size: 1.2em; /* Cambia el tamaño del texto */
+}
