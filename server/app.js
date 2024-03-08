@@ -36,20 +36,6 @@ app.get('/login', (req, res) => {
       .json({ message: 'Account not found or invalid credentials' })
   }
 })
-
-app.post("/transactions", (req, res) => {
-  const { type, amount } = req.body;
-
-  if (type === "deposit") {
-    account.movements.push({ type, amount });
-  } else if (type === "withdrawal") {
-
-    account.movements.push({ type, amount: -amount });
-  }
-
-  res.json({ success: true, message: "Transaction successful", account });
-});
-
 // User data retrieval endpoint
 app.get('/user', (req, res) => {
   const token = req.query.token
@@ -184,7 +170,8 @@ app.post('/transfer', (req, res) => {
       date: new Date().toISOString(),
     })
     debugLog('Transfer successful.')
-    res.json({ message: 'Transfer successful' })
+    // Respuesta con un mensaje de éxito
+    res.json({ message: 'Transfer successful', sourceAccount: sourceAccountObj, destinationAccount: accounts[destinationIndex] })
   })
 })
 // Start the server
