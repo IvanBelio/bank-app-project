@@ -1,0 +1,6 @@
+.timer{
+    display: block; /* Para que el botón ocupe el ancho máximo disponible */
+    margin: 0 auto; /* Para centrar el botón horizontalmente */
+    text-align: center; /* Para centrar el texto dentro del botón */
+    margin-bottom: 2%; /* Para dejar un margen debajo del timer */
+}
